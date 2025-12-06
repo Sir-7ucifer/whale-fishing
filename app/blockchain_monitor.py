@@ -200,6 +200,14 @@ class BlockchainMonitor:
         """
         logger.info("Fetching whale transactions from blockchain explorers...")
         
+        # Fetch current prices for all tracked cryptos
+        btc_price = await price_fetcher.get_price_usd("BTC")
+        eth_price = await price_fetcher.get_price_usd("ETH")
+        xrp_price = await price_fetcher.get_price_usd("XRP")
+        sol_price = await price_fetcher.get_price_usd("SOL")
+        
+        logger.info(f"Current prices: BTC=${btc_price:,.2f}, ETH=${eth_price:,.2f}, XRP=${xrp_price:,.4f}, SOL=${sol_price:,.2f}")
+        
         all_transactions = []
         
         # Fetch from different chains in parallel
