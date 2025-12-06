@@ -1,0 +1,18 @@
+[Unit]
+Description=Whale Tracker Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/home/ubuntu/whale-fishing
+Environment="PATH=/home/ubuntu/whale-fishing/venv/bin"
+ExecStart=/home/ubuntu/whale-fishing/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=whale-tracker
+
+[Install]
+WantedBy=multi-user.target

@@ -117,6 +117,84 @@ class BlockchainMonitor:
             logger.error(f"Error fetching BTC transactions: {e}")
             return []
     
+    async def fetch_xrp_transactions(self) -> List[Dict]:
+        """Fetch recent large XRP transactions from XRP Scan API."""
+        try:
+            response = await self.client.get("https://xrpscan.com/api/v2/transactions/recent")
+            response.raise_for_status()
+            data = response.json()
+            
+            transactions = []
+            if "transactions" in data:
+                for tx in data["transactions"][:30]:  # Check last 30 transactions
+                    # Look for Payment transactions with value
+                    if tx.get("type") == "Payment":
+                        amount_drops = float(tx.get("amount", 0))
+                        if isinstance(amount_drops, dict):
+                            continue  # Skip token payments, only native XRP
+                        
+                        amount_xrp = amount_drops / 1e6  # Convert drops to XRP
+                        
+                        if amount_xrp > 0:
+                            price = await price_fetcher.get_price_usd("XRP")
+                            if price:
+                                usd_value = amount_xrp * price
+                                if usd_value >= config.usd_threshold:
+                                    transactions.append({
+                                        "asset": "XRP",
+                                        "amount": amount_xrp,
+                                        "amount_usd": usd_value,
+                                        "from": tx.get("account", "Unknown"),
+                                        "from_owner": None,
+                                        "to": tx.get("destination", "Unknown"),
+                                        "to_owner": None,
+                                        "hash": tx.get("hash", ""),
+                                        "timestamp": int(tx.get("closeTime", 0))
+                                    })
+            
+            return transactions
+            
+        except Exception as e:
+            logger.error(f"Error fetching XRP transactions: {e}")
+            return []
+    
+    async def fetch_sol_transactions(self) -> List[Dict]:
+        """Fetch recent large SOL transactions from Solscan API."""
+        try:
+            # Using Solscan API for transaction data
+            response = await self.client.get("https://api.solscan.io/api/v2/transfer")
+            response.raise_for_status()
+            data = response.json()
+            
+            transactions = []
+            if "data" in data:
+                for tx in data["data"][:30]:  # Check last 30 transactions
+                    amount_lamports = float(tx.get("amount", 0))
+                    amount_sol = amount_lamports / 1e9  # Convert lamports to SOL
+                    
+                    if amount_sol > 0:
+                        price = await price_fetcher.get_price_usd("SOL")
+                        if price:
+                            usd_value = amount_sol * price
+                            if usd_value >= config.usd_threshold:
+                                transactions.append({
+                                    "asset": "SOL",
+                                    "amount": amount_sol,
+                                    "amount_usd": usd_value,
+                                    "from": tx.get("from", "Unknown"),
+                                    "from_owner": None,
+                                    "to": tx.get("to", "Unknown"),
+                                    "to_owner": None,
+                                    "hash": tx.get("signature", ""),
+                                    "timestamp": int(tx.get("blockTime", 0))
+                                })
+            
+            return transactions
+            
+        except Exception as e:
+            logger.error(f"Error fetching SOL transactions: {e}")
+            return []
+    
     async def fetch_whale_transactions(self) -> List[Dict]:
         """
         Fetch recent large transactions from free blockchain APIs.
@@ -129,14 +207,22 @@ class BlockchainMonitor:
         # Fetch from different chains in parallel
         eth_task = self.fetch_eth_transactions()
         btc_task = self.fetch_btc_transactions()
+        xrp_task = self.fetch_xrp_transactions()
+        sol_task = self.fetch_sol_transactions()
         
-        eth_txs, btc_txs = await asyncio.gather(eth_task, btc_task, return_exceptions=True)
+        eth_txs, btc_txs, xrp_txs, sol_txs = await asyncio.gather(
+            eth_task, btc_task, xrp_task, sol_task, return_exceptions=True
+        )
         
         # Combine results (handle exceptions)
         if isinstance(eth_txs, list):
             all_transactions.extend(eth_txs)
         if isinstance(btc_txs, list):
             all_transactions.extend(btc_txs)
+        if isinstance(xrp_txs, list):
+            all_transactions.extend(xrp_txs)
+        if isinstance(sol_txs, list):
+            all_transactions.extend(sol_txs)
         
         # Sort by USD value (highest first)
         all_transactions.sort(key=lambda x: x["amount_usd"], reverse=True)
