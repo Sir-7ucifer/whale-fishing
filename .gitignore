@@ -1,4 +1,8 @@
-# Python
+✅ Server: http://0.0.0.0:8000
+✅ Monitoring: Every 2 minutes (120s)
+✅ Watching: BTC, ETH, XRP, SOL
+✅ Threshold: $1,000,000 USD
+✅ Features: Buy/Sell detection with colors & emojis# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -47,3 +51,4 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+node_modules
