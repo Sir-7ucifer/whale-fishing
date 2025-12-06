@@ -90,6 +90,70 @@ class PriceFetcher:
             logger.error(f"Unexpected error fetching price for {asset}: {e}")
             return None
     
+    async def get_all_prices(self) -> Dict[str, Optional[float]]:
+        """
+        Fetch all configured asset prices in a single API call.
+        More efficient and avoids rate limiting.
+        """
+        # Check cache for all assets
+        prices = {}
+        assets_to_fetch = []
+        
+        for asset in ["BTC", "ETH", "XRP", "SOL"]:
+            cached = self.cache.get(asset)
+            if cached is not None:
+                prices[asset] = cached
+            else:
+                assets_to_fetch.append(asset)
+        
+        # If all cached, return early
+        if not assets_to_fetch:
+            return prices
+        
+        # Batch fetch from CoinGecko
+        try:
+            coingecko_ids = [config.assets[a].coingecko_id for a in assets_to_fetch]
+            url = "https://api.coingecko.com/api/v3/simple/price"
+            params = {
+                "ids": ",".join(coingecko_ids),
+                "vs_currencies": "usd"
+            }
+            
+            headers = {}
+            if config.coingecko_api_key:
+                headers["x-cg-pro-api-key"] = config.coingecko_api_key
+            
+            response = await self.client.get(url, params=params, headers=headers)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Map back to asset symbols and cache
+            for asset in assets_to_fetch:
+                coingecko_id = config.assets[asset].coingecko_id
+                if coingecko_id in data and "usd" in data[coingecko_id]:
+                    price = float(data[coingecko_id]["usd"])
+                    self.cache.set(asset, price)
+                    prices[asset] = price
+                    logger.info(f"Fetched price for {asset}: ${price:,.2f}")
+                else:
+                    prices[asset] = None
+                    logger.warning(f"Price not found for {asset}")
+            
+            return prices
+            
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error fetching batch prices: {e}")
+            # Return None for unfetched assets
+            for asset in assets_to_fetch:
+                prices[asset] = None
+            return prices
+        except Exception as e:
+            logger.error(f"Unexpected error fetching batch prices: {e}")
+            for asset in assets_to_fetch:
+                prices[asset] = None
+            return prices
+    
     async def calculate_usd_value(self, asset: str, amount: float) -> Optional[float]:
         """Calculate USD value for a given amount of an asset."""
         price = await self.get_price_usd(asset)

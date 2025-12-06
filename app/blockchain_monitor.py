@@ -214,13 +214,20 @@ class BlockchainMonitor:
         logger.info("🔍 WHALE TRANSACTION CHECK")
         logger.info("=" * 70)
         
-        # Fetch current prices for all tracked cryptos
-        btc_price = await price_fetcher.get_price_usd("BTC")
-        eth_price = await price_fetcher.get_price_usd("ETH")
-        xrp_price = await price_fetcher.get_price_usd("XRP")
-        sol_price = await price_fetcher.get_price_usd("SOL")
+        # Fetch all prices in a single batch call (avoids rate limiting)
+        prices = await price_fetcher.get_all_prices()
+        btc_price = prices.get("BTC")
+        eth_price = prices.get("ETH")
+        xrp_price = prices.get("XRP")
+        sol_price = prices.get("SOL")
         
-        logger.info(f"💰 PRICES: BTC=${btc_price:,.2f} | ETH=${eth_price:,.2f} | XRP=${xrp_price:,.4f} | SOL=${sol_price:,.2f}")
+        # Format price display with fallback for None values
+        btc_str = f"${btc_price:,.2f}" if btc_price else "N/A"
+        eth_str = f"${eth_price:,.2f}" if eth_price else "N/A"
+        xrp_str = f"${xrp_price:,.4f}" if xrp_price else "N/A"
+        sol_str = f"${sol_price:,.2f}" if sol_price else "N/A"
+        
+        logger.info(f"💰 PRICES: BTC={btc_str}, ETH={eth_str}, XRP={xrp_str}, SOL={sol_str}")
         logger.info("-" * 70)
         
         all_transactions = []
