@@ -137,7 +137,7 @@ Health check endpoint - returns service status and configuration.
 {
   "status": "running",
   "config": {
-    "assets": ["BTC", "ETH", "XRP", "SOL"],
+    "assets": ["BTC"],
     "usd_threshold": 1000000,
     "check_interval": 60
   }
@@ -148,53 +148,27 @@ Health check endpoint - returns service status and configuration.
 
 Sends a sample whale alert to Discord for verification.
 
-**Response:**
-
-```json
-{
-  "status": "posted",
-  "message": "Test alert sent to Discord"
-}
-```
-
-### `POST /whale-hook` (Deprecated)
-
-Legacy endpoint for manual webhook testing (not used for automatic monitoring).
-
-**Request Body:**
-
-```json
-{
-  "asset": "BTC",
-  "amount": 25.5,
-  "sender": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
-  "receiver": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
-  "tx_hash": "3a7d8f2e9c1b5a4d6e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d",
-  "value_usd": 2500000.00,
-  "timestamp": 1701619200
-}
-```
-
 ## Blockchain Data Sources
 
-The bot uses **free, public blockchain explorers** and automatically polls them every CHECK_INTERVAL seconds (default: 60 seconds). No external data provider configuration needed!
+The bot uses **blockchain.info** - a free, public Bitcoin explorer. It automatically polls for new transactions every CHECK_INTERVAL seconds (default: 60 seconds). No external data provider configuration needed!
 
-### Supported Networks & Data Sources
+### Bitcoin (BTC) Monitoring
 
-| Network | Data Source | API | Rate Limit | Coverage |
-| --------- | ------------ | ----- | ----------- | ---------- |
-| **Bitcoin (BTC)** | Blockchain.info | Free API | 1 req/sec | Last 10 transactions |
-| **Ethereum (ETH)** | Etherscan | Free API | 5 calls/sec | USDT transfers (latest block) |
-| **XRP (XRP)** | XRP Scan | Free API | Unlimited | Payment transactions |
-| **Solana (SOL)** | Solscan | Free API | Unlimited | Latest transactions |
+| Property | Value |
+| ---------- | ------- |
+| **Data Source** | Blockchain.info |
+| **API** | Free API |
+| **Rate Limit** | 1 req/sec |
+| **Coverage** | Latest block transactions |
+| **Explorer** | blockchain.com |
 
 ### How It Works
 
 1. **Startup**: Bot starts and initializes configuration
-2. **Monitoring Loop**: Every 60 seconds, bot fetches latest transactions from each blockchain
+2. **Monitoring Loop**: Every 60 seconds (configurable), bot fetches latest Bitcoin transactions
 3. **Filtering**: Transactions below USD_THRESHOLD are ignored
 4. **Classification**: Each transaction is analyzed for buy/sell/transfer type
-5. **Discord Alert**: Highest-valued transaction is posted to Discord with color coding
+5. **Discord Alert**: Each transaction over threshold is posted to Discord with color coding
 6. **Repeat**: Process continues indefinitely
 
 ### Testing Alerts Manually
@@ -228,9 +202,6 @@ curl -X GET http://localhost:8000/health
 | Asset | Symbol | Explorer | Data Source |
 | ------- | -------- | ---------- | ------------- |
 | Bitcoin | BTC | blockchain.com | Blockchain.info API |
-| Ethereum | ETH | etherscan.io | Etherscan API |
-| Ripple | XRP | xrpscan.com | XRP Scan API |
-| Solana | SOL | solscan.io | Solscan API |
 
 ### Known Exchange Addresses
 
@@ -272,20 +243,20 @@ Tx: [View on Explorer]
 **Sell Alert (Red 🔴):**
 
 ```text
-📉 Whale SOLD 50 ETH!
+📉 Whale SOLD 25 BTC!
 Value: $1,500,000
 From: Unknown Whale
-To: Coinbase (0x456...)
+To: Coinbase
 Tx: [View on Explorer]
 ```
 
 **Transfer Alert (Orange 🟠):**
 
 ```text
-🔄 Whale TRANSFERRED 1000 XRP
+🔄 Whale TRANSFERRED 15 BTC
 Value: $1,200,000
-From: 0x789...
-To: 0xABC...
+From: bc1q...
+To: bc1q...
 Tx: [View on Explorer]
 ```
 
@@ -410,18 +381,15 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN
 
 ### Blockchain API errors
 
-- **Etherscan**: Check internet connectivity and rate limits (5 calls/sec)
-- **Blockchain.info**: Verify BTC network is online
-- **XRP Scan**: Ensure XRP Ledger is responding
-- **Solscan**: Check Solana network status
+- **Blockchain.info**: Verify internet connectivity and BTC network is online
 
-The bot will skip failed API calls and retry on next interval.
+The bot will retry on the next check interval if API calls fail.
 
 ### High USD_THRESHOLD showing no alerts
 
 - Increase sensitivity by lowering USD_THRESHOLD in `.env`
 - Check blockchain explorer directly for transactions
-- Verify CoinGecko pricing is working: `curl https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd`
+- Verify CoinGecko pricing is working: `curl https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd`
 
 ### Service won't start on Ubuntu
 
@@ -447,7 +415,7 @@ whale-fishing/
 │   ├── config.py                # Configuration & asset definitions
 │   ├── pricing.py               # CoinGecko price fetching with cache
 │   ├── discord_poster.py        # Discord webhook integration
-│   ├── blockchain_monitor.py    # Multi-chain transaction fetchers
+│   ├── blockchain_monitor.py    # Bitcoin transaction fetcher
 │   └── address_identifier.py    # Exchange detection & tx classification
 ├── requirements.txt             # Python dependencies
 ├── .env                         # Configuration (user-created)
@@ -465,9 +433,9 @@ whale-fishing/
 | -------- | --------- |
 | `main.py` | FastAPI app with lifespan management, routes, monitoring loop |
 | `config.py` | Pydantic-based configuration loading from `.env` |
-| `pricing.py` | CoinGecko API client with in-memory TTL cache |
+| `pricing.py` | CoinGecko API client for BTC price fetching with in-memory TTL cache |
 | `discord_poster.py` | Discord webhook posting with retry logic (tenacity) |
-| `blockchain_monitor.py` | Parallel fetchers for BTC/ETH/XRP/SOL transaction data |
+| `blockchain_monitor.py` | Bitcoin transaction fetcher from blockchain.info API |
 | `address_identifier.py` | Exchange address database & buy/sell/transfer classification |
 
 ## Development
@@ -500,8 +468,8 @@ PRICE_CACHE_TTL=120         # Cache prices for 2 minutes
 
 ## Possible Enhancements
 
-- Add more blockchains (Cardano, Polygon, Bitcoin Cash, etc.)
-- Lower or tiered USD thresholds for different alerts
+- Add more blockchains (Ethereum, Cardano, Polygon, Bitcoin Cash, etc.) with reliable APIs
+- Lower or tiered USD thresholds for different alert sensitivity
 - Database persistence for transaction history
 - Web dashboard showing recent whale activity
 - Telegram bot integration alongside Discord
@@ -526,9 +494,9 @@ For issues or questions:
 
 ---
 
-**Built with:** FastAPI • CoinGecko • Etherscan • Blockchain.info • Discord Webhooks
+**Built with:** FastAPI • CoinGecko • Blockchain.info • Discord Webhooks
 
-**Monitors:** Bitcoin (BTC) • Ethereum (ETH) • Ripple (XRP) • Solana (SOL)
+**Monitors:** Bitcoin (BTC)
 
 **Deploys on:** Windows • Linux/Ubuntu • Docker
 
