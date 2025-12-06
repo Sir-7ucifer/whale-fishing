@@ -20,76 +20,6 @@ class BlockchainMonitor:
         self.is_running = False
         self.check_interval = config.check_interval
         self.posted_hashes = set()  # Track posted transaction hashes
-        
-    async def fetch_eth_transactions(self) -> List[Dict]:
-        """Fetch recent large ETH transactions from Etherscan."""
-        try:
-            url = "https://api.etherscan.io/api"
-            params = {
-                "module": "proxy",
-                "action": "eth_blockNumber",
-            }
-            
-            # First get the latest block number
-            response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get("result"):
-                # Use Etherscan's advanced API to get large value transactions
-                url = "https://api.etherscan.io/api"
-                params = {
-                    "module": "account",
-                    "action": "txlist",
-                    "address": "0x00000000219ab540356cBB839Cbe05303d7705Fa",  # ETH2 deposit contract
-                    "startblock": 0,
-                    "endblock": 99999999,
-                    "sort": "desc",
-                    "page": 1,
-                    "offset": 50
-                }
-                
-                response = await self.client.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                
-                transactions = []
-                if data.get("status") == "1" and data.get("result"):
-                    logger.debug(f"ETH: Received {len(data['result'])} transactions from deposit contract")
-                    price = await price_fetcher.get_price_usd("ETH")
-                    
-                    large_tx_count = 0
-                    for tx in data["result"][:50]:
-                        amount_wei = float(tx.get("value", 0))
-                        amount_eth = amount_wei / 1e18
-                        
-                        if amount_eth > 10 and price:  # Check transactions over 10 ETH
-                            large_tx_count += 1
-                            usd_value = amount_eth * price
-                            if usd_value >= config.usd_threshold:
-                                transactions.append({
-                                    "asset": "ETH",
-                                    "amount": amount_eth,
-                                    "amount_usd": usd_value,
-                                    "from": tx.get("from", "Unknown"),
-                                    "from_owner": None,
-                                    "to": tx.get("to", "Unknown"),
-                                    "to_owner": None,
-                                    "hash": tx.get("hash", ""),
-                                    "timestamp": int(tx.get("timeStamp", 0))
-                                })
-                    
-                    logger.debug(f"ETH: {large_tx_count} transactions >10 ETH, {len(transactions)} over ${config.usd_threshold:,.0f}")
-                else:
-                    logger.debug(f"ETH: API status={data.get('status')}, message={data.get('message', 'N/A')}")
-                
-                return transactions
-            
-            return []
-            
-        except Exception as e:
-            logger.error(f"Error fetching ETH transactions: {e}")
-            return []
     
     async def fetch_btc_transactions(self) -> List[Dict]:
         """Fetch recent large BTC transactions from Blockchain.com API."""
@@ -140,71 +70,6 @@ class BlockchainMonitor:
             logger.error(f"Error fetching BTC transactions: {e}")
             return []
     
-    async def fetch_xrp_transactions(self) -> List[Dict]:
-        """Fetch recent large XRP transactions from public ledger."""
-        try:
-            # Use XRPL public API instead of xrpscan which requires auth
-            response = await self.client.get("https://data.ripple.com/v2/transactions/")
-            response.raise_for_status()
-            data = response.json()
-            
-            transactions = []
-            if "transactions" in data:
-                total_txs = len(data.get("transactions", []))
-                logger.debug(f"XRP: Received {total_txs} transactions from API")
-                price = await price_fetcher.get_price_usd("XRP")
-                
-                payment_count = 0
-                for tx in data.get("transactions", [])[:50]:
-                    tx_data = tx.get("tx", {})
-                    
-                    # Only look at Payment transactions
-                    if tx_data.get("TransactionType") != "Payment":
-                        continue
-                    
-                    payment_count += 1
-                    amount = tx_data.get("Amount")
-                    
-                    # Skip if amount is an object (issued currency)
-                    if isinstance(amount, dict):
-                        continue
-                    
-                    try:
-                        amount_drops = float(amount)
-                        amount_xrp = amount_drops / 1e6  # Convert drops to XRP
-                        
-                        if amount_xrp > 1 and price:  # Filter to significant transactions
-                            usd_value = amount_xrp * price
-                            if usd_value >= config.usd_threshold:
-                                transactions.append({
-                                    "asset": "XRP",
-                                    "amount": amount_xrp,
-                                    "amount_usd": usd_value,
-                                    "from": tx_data.get("Account", "Unknown"),
-                                    "from_owner": None,
-                                    "to": tx_data.get("Destination", "Unknown"),
-                                    "to_owner": None,
-                                    "hash": tx_data.get("hash", ""),
-                                    "timestamp": int(tx_data.get("date", 0))
-                                })
-                    except (ValueError, TypeError):
-                        continue
-                
-                logger.debug(f"XRP: {payment_count} Payment transactions, {len(transactions)} over threshold")
-            else:
-                logger.debug("XRP: No 'transactions' key in API response")
-            
-            return transactions
-            
-        except Exception as e:
-            logger.error(f"Error fetching XRP transactions: {e}")
-            return []
-    
-    async def fetch_sol_transactions(self) -> List[Dict]:
-        """Fetch recent large SOL transactions - currently disabled (requires API auth)."""
-        logger.debug("SOL monitoring disabled: Solscan API requires authentication")
-        return []
-    
     async def fetch_whale_transactions(self) -> List[Dict]:
         """
         Fetch recent large transactions from free blockchain APIs.
@@ -214,50 +79,27 @@ class BlockchainMonitor:
         logger.info("🔍 WHALE TRANSACTION CHECK")
         logger.info("=" * 70)
         
-        # Fetch all prices in a single batch call (avoids rate limiting)
-        prices = await price_fetcher.get_all_prices()
-        btc_price = prices.get("BTC")
-        eth_price = prices.get("ETH")
-        xrp_price = prices.get("XRP")
-        sol_price = prices.get("SOL")
+        # Fetch BTC price
+        btc_price = await price_fetcher.get_price_usd("BTC")
         
-        # Format price display with fallback for None values
+        # Format price display
         btc_str = f"${btc_price:,.2f}" if btc_price else "N/A"
-        eth_str = f"${eth_price:,.2f}" if eth_price else "N/A"
-        xrp_str = f"${xrp_price:,.4f}" if xrp_price else "N/A"
-        sol_str = f"${sol_price:,.2f}" if sol_price else "N/A"
         
-        logger.info(f"💰 PRICES: BTC={btc_str}, ETH={eth_str}, XRP={xrp_str}, SOL={sol_str}")
+        logger.info(f"💰 BTC PRICE: {btc_str}")
         logger.info("-" * 70)
         
         all_transactions = []
         
-        # Fetch from different chains in parallel
-        eth_task = self.fetch_eth_transactions()
-        btc_task = self.fetch_btc_transactions()
-        xrp_task = self.fetch_xrp_transactions()
-        sol_task = self.fetch_sol_transactions()
+        # Fetch BTC transactions
+        btc_txs = await self.fetch_btc_transactions()
         
-        eth_txs, btc_txs, xrp_txs, sol_txs = await asyncio.gather(
-            eth_task, btc_task, xrp_task, sol_task, return_exceptions=True
-        )
-        
-        # Log results from each chain
+        # Log results
         logger.info("📊 NETWORK RESULTS:")
-        logger.info(f"   ETH: {len(eth_txs) if isinstance(eth_txs, list) else 'ERROR'} transactions")
         logger.info(f"   BTC: {len(btc_txs) if isinstance(btc_txs, list) else 'ERROR'} transactions")
-        logger.info(f"   XRP: {len(xrp_txs) if isinstance(xrp_txs, list) else 'ERROR'} transactions")
-        logger.info(f"   SOL: {len(sol_txs) if isinstance(sol_txs, list) else 'ERROR'} transactions (disabled)")
         
-        # Combine results (handle exceptions)
-        if isinstance(eth_txs, list):
-            all_transactions.extend(eth_txs)
+        # Add BTC transactions to results
         if isinstance(btc_txs, list):
             all_transactions.extend(btc_txs)
-        if isinstance(xrp_txs, list):
-            all_transactions.extend(xrp_txs)
-        if isinstance(sol_txs, list):
-            all_transactions.extend(sol_txs)
         
         # Sort by USD value (highest first)
         all_transactions.sort(key=lambda x: x["amount_usd"], reverse=True)

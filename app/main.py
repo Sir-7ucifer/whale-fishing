@@ -68,7 +68,7 @@ class WhaleEvent(BaseModel):
     This schema is designed to work with various blockchain data providers.
     Providers should send events in this format, or the endpoint will normalize them.
     """
-    asset: str = Field(..., description="Asset symbol (BTC, ETH, XRP, SOL)")
+    asset: str = Field(..., description="Asset symbol (BTC)")
     amount: float = Field(..., description="Amount transferred in native units")
     sender: str = Field(..., description="Sender address")
     receiver: str = Field(..., description="Receiver address")

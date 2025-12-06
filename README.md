@@ -1,18 +1,18 @@
 # 🐋 Whale Tracker Discord Bot
 
-A real-time crypto whale transaction monitoring system that automatically detects large transfers across Bitcoin (BTC), Ethereum (ETH), XRP, and Solana (SOL) networks and posts instant alerts to Discord. Runs continuously with configurable check intervals and supports buy/sell/transfer classification.
+A real-time Bitcoin whale transaction monitoring system that automatically detects large BTC transfers and posts instant alerts to Discord. Runs continuously with configurable check intervals and supports buy/sell/transfer classification.
 
 ## Features
 
-- **Multi-Chain Support**: Monitors BTC, ETH, XRP, and SOL networks simultaneously
-- **Automatic Monitoring**: Continuous polling of blockchain explorers (1-minute intervals by default)
+- **Bitcoin (BTC) Monitoring**: Real-time monitoring of Bitcoin blockchain using free APIs
+- **Automatic Monitoring**: Continuous polling of blockchain.info (60-second intervals by default)
 - **Configurable Threshold**: Set custom USD value thresholds (default: $1,000,000+)
 - **Transaction Classification**: Automatically detects buy/sell/transfer activity with exchange identification
 - **Real-Time Alerts**: Posts color-coded embeds to Discord (🟢 buy, 🔴 sell, 🟠 transfer)
-- **Free APIs Only**: Uses public blockchain explorers (Etherscan, Blockchain.info, XRP Scan, Solscan)
-- **Automatic USD Pricing**: Fetches live prices from CoinGecko with 60-second cache
+- **Free APIs Only**: Uses public blockchain explorer (Blockchain.info) - no authentication required
+- **Automatic USD Pricing**: Fetches live BTC price from CoinGecko with 60-second cache
 - **Retry Logic**: Reliable Discord posting with exponential backoff (3 attempts)
-- **Block Explorer Links**: Direct links to transactions on chain-specific explorers
+- **Block Explorer Links**: Direct links to transactions on blockchain.com
 - **Ubuntu Auto-Start**: Systemd service for 24/7 operation with auto-restart on failure
 
 ## Architecture

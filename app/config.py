@@ -29,22 +29,7 @@ class Config(BaseModel):
             symbol="BTC",
             coingecko_id="bitcoin",
             explorer_url="https://blockchain.com/btc/tx/{tx_hash}"
-        ),
-        "ETH": AssetConfig(
-            symbol="ETH",
-            coingecko_id="ethereum",
-            explorer_url="https://etherscan.io/tx/{tx_hash}"
-        ),
-        "XRP": AssetConfig(
-            symbol="XRP",
-            coingecko_id="ripple",
-            explorer_url="https://xrpscan.com/tx/{tx_hash}"
-        ),
-        "SOL": AssetConfig(
-            symbol="SOL",
-            coingecko_id="solana",
-            explorer_url="https://solscan.io/tx/{tx_hash}"
-        ),
+        )
     }
     
     @property

@@ -99,7 +99,7 @@ class PriceFetcher:
         prices = {}
         assets_to_fetch = []
         
-        for asset in ["BTC", "ETH", "XRP", "SOL"]:
+        for asset in ["BTC"]:
             cached = self.cache.get(asset)
             if cached is not None:
                 prices[asset] = cached
