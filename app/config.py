@@ -21,6 +21,7 @@ class Config(BaseModel):
     coingecko_api_key: str = Field(default_factory=lambda: os.getenv("COINGECKO_API_KEY", ""))
     check_interval: int = Field(default_factory=lambda: int(os.getenv("CHECK_INTERVAL", "1")))
     price_cache_ttl_seconds: int = Field(default_factory=lambda: int(os.getenv("PRICE_CACHE_TTL", "60")))
+    log_level: str = Field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
     
     # Supported assets with explorer URLs
     assets: Dict[str, AssetConfig] = {

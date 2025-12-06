@@ -12,8 +12,10 @@ from app.discord_poster import discord_poster
 from app.blockchain_monitor import blockchain_monitor
 
 # Configure logging with better readability for systemd journalctl
+from app.config import config as app_config
+log_level = getattr(logging, app_config.log_level.upper(), logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )

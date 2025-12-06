@@ -36,20 +36,17 @@ class BlockchainMonitor:
             data = response.json()
             
             if data.get("result"):
-                latest_block_hex = data["result"]
-                latest_block = int(latest_block_hex, 16)
-                start_block = max(0, latest_block - 100)  # Check last 100 blocks
-                
-                # Get transactions in the block range
+                # Use Etherscan's advanced API to get large value transactions
                 url = "https://api.etherscan.io/api"
                 params = {
                     "module": "account",
-                    "action": "txlistinternal",
-                    "startblock": start_block,
-                    "endblock": latest_block,
+                    "action": "txlist",
+                    "address": "0x00000000219ab540356cBB839Cbe05303d7705Fa",  # ETH2 deposit contract
+                    "startblock": 0,
+                    "endblock": 99999999,
                     "sort": "desc",
                     "page": 1,
-                    "offset": 100
+                    "offset": 50
                 }
                 
                 response = await self.client.get(url, params=params)
@@ -58,26 +55,33 @@ class BlockchainMonitor:
                 
                 transactions = []
                 if data.get("status") == "1" and data.get("result"):
+                    logger.debug(f"ETH: Received {len(data['result'])} transactions from deposit contract")
+                    price = await price_fetcher.get_price_usd("ETH")
+                    
+                    large_tx_count = 0
                     for tx in data["result"][:50]:
                         amount_wei = float(tx.get("value", 0))
                         amount_eth = amount_wei / 1e18
                         
-                        if amount_eth > 0.1:  # Filter significant transactions
-                            price = await price_fetcher.get_price_usd("ETH")
-                            if price:
-                                usd_value = amount_eth * price
-                                if usd_value >= config.usd_threshold:
-                                    transactions.append({
-                                        "asset": "ETH",
-                                        "amount": amount_eth,
-                                        "amount_usd": usd_value,
-                                        "from": tx.get("from", "Unknown"),
-                                        "from_owner": None,
-                                        "to": tx.get("to", "Unknown"),
-                                        "to_owner": None,
-                                        "hash": tx.get("hash", ""),
-                                        "timestamp": int(tx.get("timeStamp", 0))
-                                    })
+                        if amount_eth > 10 and price:  # Check transactions over 10 ETH
+                            large_tx_count += 1
+                            usd_value = amount_eth * price
+                            if usd_value >= config.usd_threshold:
+                                transactions.append({
+                                    "asset": "ETH",
+                                    "amount": amount_eth,
+                                    "amount_usd": usd_value,
+                                    "from": tx.get("from", "Unknown"),
+                                    "from_owner": None,
+                                    "to": tx.get("to", "Unknown"),
+                                    "to_owner": None,
+                                    "hash": tx.get("hash", ""),
+                                    "timestamp": int(tx.get("timeStamp", 0))
+                                })
+                    
+                    logger.debug(f"ETH: {large_tx_count} transactions >10 ETH, {len(transactions)} over ${config.usd_threshold:,.0f}")
+                else:
+                    logger.debug(f"ETH: API status={data.get('status')}, message={data.get('message', 'N/A')}")
                 
                 return transactions
             
@@ -146,6 +150,11 @@ class BlockchainMonitor:
             
             transactions = []
             if "transactions" in data:
+                total_txs = len(data.get("transactions", []))
+                logger.debug(f"XRP: Received {total_txs} transactions from API")
+                price = await price_fetcher.get_price_usd("XRP")
+                
+                payment_count = 0
                 for tx in data.get("transactions", [])[:50]:
                     tx_data = tx.get("tx", {})
                     
@@ -153,6 +162,7 @@ class BlockchainMonitor:
                     if tx_data.get("TransactionType") != "Payment":
                         continue
                     
+                    payment_count += 1
                     amount = tx_data.get("Amount")
                     
                     # Skip if amount is an object (issued currency)
@@ -163,24 +173,26 @@ class BlockchainMonitor:
                         amount_drops = float(amount)
                         amount_xrp = amount_drops / 1e6  # Convert drops to XRP
                         
-                        if amount_xrp > 1:  # Filter to significant transactions
-                            price = await price_fetcher.get_price_usd("XRP")
-                            if price:
-                                usd_value = amount_xrp * price
-                                if usd_value >= config.usd_threshold:
-                                    transactions.append({
-                                        "asset": "XRP",
-                                        "amount": amount_xrp,
-                                        "amount_usd": usd_value,
-                                        "from": tx_data.get("Account", "Unknown"),
-                                        "from_owner": None,
-                                        "to": tx_data.get("Destination", "Unknown"),
-                                        "to_owner": None,
-                                        "hash": tx_data.get("hash", ""),
-                                        "timestamp": int(tx_data.get("date", 0))
-                                    })
+                        if amount_xrp > 1 and price:  # Filter to significant transactions
+                            usd_value = amount_xrp * price
+                            if usd_value >= config.usd_threshold:
+                                transactions.append({
+                                    "asset": "XRP",
+                                    "amount": amount_xrp,
+                                    "amount_usd": usd_value,
+                                    "from": tx_data.get("Account", "Unknown"),
+                                    "from_owner": None,
+                                    "to": tx_data.get("Destination", "Unknown"),
+                                    "to_owner": None,
+                                    "hash": tx_data.get("hash", ""),
+                                    "timestamp": int(tx_data.get("date", 0))
+                                })
                     except (ValueError, TypeError):
                         continue
+                
+                logger.debug(f"XRP: {payment_count} Payment transactions, {len(transactions)} over threshold")
+            else:
+                logger.debug("XRP: No 'transactions' key in API response")
             
             return transactions
             
