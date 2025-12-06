@@ -26,46 +26,62 @@ class BlockchainMonitor:
         try:
             url = "https://api.etherscan.io/api"
             params = {
-                "module": "account",
-                "action": "txlist",
-                "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",  # USDT contract as proxy for activity
-                "startblock": 0,
-                "endblock": 99999999,
-                "page": 1,
-                "offset": 50,
-                "sort": "desc"
+                "module": "proxy",
+                "action": "eth_blockNumber",
             }
             
+            # First get the latest block number
             response = await self.client.get(url, params=params)
             response.raise_for_status()
             data = response.json()
             
-            transactions = []
-            if data.get("status") == "1" and data.get("result"):
-                for tx in data["result"][:20]:  # Check last 20 transactions
-                    amount_wei = float(tx.get("value", 0))
-                    amount_eth = amount_wei / 1e18
-                    
-                    if amount_eth > 0:  # Only process transactions with value
-                        price = await price_fetcher.get_price_usd("ETH")
-                        if price:
-                            usd_value = amount_eth * price
-                            if usd_value >= config.usd_threshold:
-                                transactions.append({
-                                    "asset": "ETH",
-                                    "amount": amount_eth,
-                                    "amount_usd": usd_value,
-                                    "from": tx.get("from", "Unknown"),
-                                    "from_owner": None,
-                                    "to": tx.get("to", "Unknown"),
-                                    "to_owner": None,
-                                    "hash": tx.get("hash", ""),
-                                    "timestamp": int(tx.get("timeStamp", 0))
-                                })
-            else:
-                logger.debug(f"ETH API response: {data.get('message', 'No data')}")
+            if data.get("result"):
+                latest_block_hex = data["result"]
+                latest_block = int(latest_block_hex, 16)
+                start_block = max(0, latest_block - 100)  # Check last 100 blocks
+                
+                # Get transactions in the block range
+                url = "https://api.etherscan.io/api"
+                params = {
+                    "module": "account",
+                    "action": "txlistinternal",
+                    "startblock": start_block,
+                    "endblock": latest_block,
+                    "sort": "desc",
+                    "page": 1,
+                    "offset": 100
+                }
+                
+                response = await self.client.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+                
+                transactions = []
+                if data.get("status") == "1" and data.get("result"):
+                    for tx in data["result"][:50]:
+                        amount_wei = float(tx.get("value", 0))
+                        amount_eth = amount_wei / 1e18
+                        
+                        if amount_eth > 0.1:  # Filter significant transactions
+                            price = await price_fetcher.get_price_usd("ETH")
+                            if price:
+                                usd_value = amount_eth * price
+                                if usd_value >= config.usd_threshold:
+                                    transactions.append({
+                                        "asset": "ETH",
+                                        "amount": amount_eth,
+                                        "amount_usd": usd_value,
+                                        "from": tx.get("from", "Unknown"),
+                                        "from_owner": None,
+                                        "to": tx.get("to", "Unknown"),
+                                        "to_owner": None,
+                                        "hash": tx.get("hash", ""),
+                                        "timestamp": int(tx.get("timeStamp", 0))
+                                    })
+                
+                return transactions
             
-            return transactions
+            return []
             
         except Exception as e:
             logger.error(f"Error fetching ETH transactions: {e}")
@@ -121,24 +137,33 @@ class BlockchainMonitor:
             return []
     
     async def fetch_xrp_transactions(self) -> List[Dict]:
-        """Fetch recent large XRP transactions from XRP Scan API."""
+        """Fetch recent large XRP transactions from public ledger."""
         try:
-            response = await self.client.get("https://xrpscan.com/api/v2/transactions/recent")
+            # Use XRPL public API instead of xrpscan which requires auth
+            response = await self.client.get("https://data.ripple.com/v2/transactions/")
             response.raise_for_status()
             data = response.json()
             
             transactions = []
             if "transactions" in data:
-                for tx in data["transactions"][:30]:  # Check last 30 transactions
-                    # Look for Payment transactions with value
-                    if tx.get("type") == "Payment":
-                        amount_drops = float(tx.get("amount", 0))
-                        if isinstance(amount_drops, dict):
-                            continue  # Skip token payments, only native XRP
-                        
+                for tx in data.get("transactions", [])[:50]:
+                    tx_data = tx.get("tx", {})
+                    
+                    # Only look at Payment transactions
+                    if tx_data.get("TransactionType") != "Payment":
+                        continue
+                    
+                    amount = tx_data.get("Amount")
+                    
+                    # Skip if amount is an object (issued currency)
+                    if isinstance(amount, dict):
+                        continue
+                    
+                    try:
+                        amount_drops = float(amount)
                         amount_xrp = amount_drops / 1e6  # Convert drops to XRP
                         
-                        if amount_xrp > 0:
+                        if amount_xrp > 1:  # Filter to significant transactions
                             price = await price_fetcher.get_price_usd("XRP")
                             if price:
                                 usd_value = amount_xrp * price
@@ -147,15 +172,15 @@ class BlockchainMonitor:
                                         "asset": "XRP",
                                         "amount": amount_xrp,
                                         "amount_usd": usd_value,
-                                        "from": tx.get("account", "Unknown"),
+                                        "from": tx_data.get("Account", "Unknown"),
                                         "from_owner": None,
-                                        "to": tx.get("destination", "Unknown"),
+                                        "to": tx_data.get("Destination", "Unknown"),
                                         "to_owner": None,
-                                        "hash": tx.get("hash", ""),
-                                        "timestamp": int(tx.get("closeTime", 0))
+                                        "hash": tx_data.get("hash", ""),
+                                        "timestamp": int(tx_data.get("date", 0))
                                     })
-            else:
-                logger.debug(f"XRP API response: No transactions in response")
+                    except (ValueError, TypeError):
+                        continue
             
             return transactions
             
@@ -164,43 +189,9 @@ class BlockchainMonitor:
             return []
     
     async def fetch_sol_transactions(self) -> List[Dict]:
-        """Fetch recent large SOL transactions from Solscan API."""
-        try:
-            # Using Solscan API for transaction data
-            response = await self.client.get("https://api.solscan.io/api/v2/transfer")
-            response.raise_for_status()
-            data = response.json()
-            
-            transactions = []
-            if "data" in data:
-                for tx in data["data"][:30]:  # Check last 30 transactions
-                    amount_lamports = float(tx.get("amount", 0))
-                    amount_sol = amount_lamports / 1e9  # Convert lamports to SOL
-                    
-                    if amount_sol > 0:
-                        price = await price_fetcher.get_price_usd("SOL")
-                        if price:
-                            usd_value = amount_sol * price
-                            if usd_value >= config.usd_threshold:
-                                transactions.append({
-                                    "asset": "SOL",
-                                    "amount": amount_sol,
-                                    "amount_usd": usd_value,
-                                    "from": tx.get("from", "Unknown"),
-                                    "from_owner": None,
-                                    "to": tx.get("to", "Unknown"),
-                                    "to_owner": None,
-                                    "hash": tx.get("signature", ""),
-                                    "timestamp": int(tx.get("blockTime", 0))
-                                })
-            else:
-                logger.debug("SOL API response: No data in response")
-            
-            return transactions
-            
-        except Exception as e:
-            logger.error(f"Error fetching SOL transactions: {e}")
-            return []
+        """Fetch recent large SOL transactions - currently disabled (requires API auth)."""
+        logger.debug("SOL monitoring disabled: Solscan API requires authentication")
+        return []
     
     async def fetch_whale_transactions(self) -> List[Dict]:
         """
