@@ -11,10 +11,11 @@ from app.pricing import price_fetcher
 from app.discord_poster import discord_poster
 from app.blockchain_monitor import blockchain_monitor
 
-# Configure logging
+# Configure logging with better readability for systemd journalctl
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,13 @@ async def lifespan(app: FastAPI):
         logger.error(f"Configuration errors: {errors}")
         raise RuntimeError(f"Invalid configuration: {', '.join(errors)}")
     
-    logger.info("Whale Tracker Bot starting up...")
-    logger.info(f"Supported assets: {', '.join(config.supported_assets)}")
-    logger.info(f"USD threshold: ${config.usd_threshold:,.0f}")
+    logger.info("=" * 70)
+    logger.info("🚀 WHALE TRACKER BOT STARTING")
+    logger.info("=" * 70)
+    logger.info(f"Assets: {', '.join(config.supported_assets)}")
+    logger.info(f"Threshold: ${config.usd_threshold:,.0f}")
+    logger.info(f"Check interval: {config.check_interval}s")
+    logger.info("=" * 70)
     
     # Start blockchain monitoring loop
     await blockchain_monitor.start()
@@ -38,7 +43,9 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("Shutting down Whale Tracker Bot...")
+    logger.info("=" * 70)
+    logger.info("🛑 WHALE TRACKER BOT STOPPING")
+    logger.info("=" * 70)
     await blockchain_monitor.stop()
     await price_fetcher.close()
     await discord_poster.close()

@@ -322,11 +322,16 @@ class BlockchainMonitor:
     
     async def monitor_loop(self):
         """Main monitoring loop that checks every second for real-time updates."""
-        logger.info(f"Starting blockchain monitoring (checking every {self.check_interval}s)")
+        logger.info("")
+        logger.info("▶️  Monitoring loop started")
+        logger.info(f"⏱️  Check interval: {self.check_interval} second(s)")
+        logger.info("")
         self.is_running = True
         
+        check_count = 0
         while self.is_running:
             try:
+                check_count += 1
                 await self.process_highest_transaction()
             except Exception as e:
                 logger.error(f"Error in monitoring loop: {e}")
