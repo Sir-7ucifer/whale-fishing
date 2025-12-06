@@ -59,7 +59,7 @@ class PriceFetcher:
         coingecko_id = config.assets[asset].coingecko_id
         
         try:
-            url = f"https://api.coingecko.com/api/v3/simple/price"
+            url = "https://api.coingecko.com/api/v3/simple/price"
             params = {
                 "ids": coingecko_id,
                 "vs_currencies": "usd"

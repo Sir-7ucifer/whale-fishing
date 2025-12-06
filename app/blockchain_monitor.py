@@ -1,8 +1,7 @@
 """Blockchain monitoring service that polls for whale transactions."""
 import asyncio
 import logging
-from typing import List, Dict, Optional
-from datetime import datetime
+from typing import List, Dict
 import httpx
 
 from app.config import config

@@ -1,6 +1,6 @@
 """Main FastAPI application for Whale Tracker Discord Bot."""
 import logging
-from typing import Any, Dict, Optional
+from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException
