@@ -19,7 +19,7 @@ class Config(BaseModel):
     discord_webhook_url: str = Field(default_factory=lambda: os.getenv("DISCORD_WEBHOOK_URL", ""))
     usd_threshold: float = Field(default_factory=lambda: float(os.getenv("USD_THRESHOLD", "1000000")))
     coingecko_api_key: str = Field(default_factory=lambda: os.getenv("COINGECKO_API_KEY", ""))
-    check_interval: int = Field(default_factory=lambda: int(os.getenv("CHECK_INTERVAL", "600")))
+    check_interval: int = Field(default_factory=lambda: int(os.getenv("CHECK_INTERVAL", "1")))
     price_cache_ttl_seconds: int = Field(default_factory=lambda: int(os.getenv("PRICE_CACHE_TTL", "60")))
     
     # Supported assets with explorer URLs

@@ -19,6 +19,7 @@ class BlockchainMonitor:
         self.client = httpx.AsyncClient(timeout=30.0)
         self.is_running = False
         self.check_interval = config.check_interval
+        self.posted_hashes = set()  # Track posted transaction hashes
         
     async def fetch_eth_transactions(self) -> List[Dict]:
         """Fetch recent large ETH transactions from Etherscan."""
@@ -240,9 +241,14 @@ class BlockchainMonitor:
         
         logger.info(f"Processing {len(transactions)} whale transaction(s)...")
         
-        # Post each transaction to Discord
+        # Post each transaction to Discord (skip duplicates)
         posted_count = 0
         for tx in transactions:
+            # Skip if already posted
+            if tx['hash'] in self.posted_hashes:
+                logger.debug(f"Skipping duplicate transaction: {tx['hash']}")
+                continue
+            
             logger.info(
                 f"Transaction: {tx['asset']} "
                 f"${tx['amount_usd']:,.0f} "
@@ -279,16 +285,18 @@ class BlockchainMonitor:
             )
             
             if success:
+                # Track this transaction to avoid duplicates
+                self.posted_hashes.add(tx['hash'])
                 posted_count += 1
                 # Small delay between posts to avoid rate limiting
                 await asyncio.sleep(1)
             else:
                 logger.error(f"Failed to post {tx['asset']} transaction to Discord")
         
-        logger.info(f"Successfully posted {posted_count}/{len(transactions)} transactions to Discord")
+        logger.info(f"Successfully posted {posted_count} new transaction(s) to Discord")
     
     async def monitor_loop(self):
-        """Main monitoring loop that checks every 10 minutes."""
+        """Main monitoring loop that checks every second for real-time updates."""
         logger.info(f"Starting blockchain monitoring (checking every {self.check_interval}s)")
         self.is_running = True
         
@@ -298,8 +306,7 @@ class BlockchainMonitor:
             except Exception as e:
                 logger.error(f"Error in monitoring loop: {e}")
             
-            # Wait 10 minutes before next check
-            logger.info(f"Waiting {self.check_interval} seconds until next check...")
+            # Wait before next check (1 second for fast updates)
             await asyncio.sleep(self.check_interval)
     
     async def start(self):
