@@ -198,7 +198,9 @@ class BlockchainMonitor:
         Fetch recent large transactions from free blockchain APIs.
         Returns list of transactions sorted by USD value (highest first).
         """
-        logger.info("Fetching whale transactions from blockchain explorers...")
+        logger.info("=" * 70)
+        logger.info("🔍 WHALE TRANSACTION CHECK")
+        logger.info("=" * 70)
         
         # Fetch current prices for all tracked cryptos
         btc_price = await price_fetcher.get_price_usd("BTC")
@@ -206,7 +208,8 @@ class BlockchainMonitor:
         xrp_price = await price_fetcher.get_price_usd("XRP")
         sol_price = await price_fetcher.get_price_usd("SOL")
         
-        logger.info(f"Current prices: BTC=${btc_price:,.2f}, ETH=${eth_price:,.2f}, XRP=${xrp_price:,.4f}, SOL=${sol_price:,.2f}")
+        logger.info(f"💰 PRICES: BTC=${btc_price:,.2f} | ETH=${eth_price:,.2f} | XRP=${xrp_price:,.4f} | SOL=${sol_price:,.2f}")
+        logger.info("-" * 70)
         
         all_transactions = []
         
@@ -221,10 +224,11 @@ class BlockchainMonitor:
         )
         
         # Log results from each chain
-        logger.info(f"ETH: {len(eth_txs) if isinstance(eth_txs, list) else 'ERROR'} transactions found")
-        logger.info(f"BTC: {len(btc_txs) if isinstance(btc_txs, list) else 'ERROR'} transactions found")
-        logger.info(f"XRP: {len(xrp_txs) if isinstance(xrp_txs, list) else 'ERROR'} transactions found")
-        logger.info(f"SOL: {len(sol_txs) if isinstance(sol_txs, list) else 'ERROR'} transactions found")
+        logger.info("📊 NETWORK RESULTS:")
+        logger.info(f"   ETH: {len(eth_txs) if isinstance(eth_txs, list) else 'ERROR'} transactions")
+        logger.info(f"   BTC: {len(btc_txs) if isinstance(btc_txs, list) else 'ERROR'} transactions")
+        logger.info(f"   XRP: {len(xrp_txs) if isinstance(xrp_txs, list) else 'ERROR'} transactions")
+        logger.info(f"   SOL: {len(sol_txs) if isinstance(sol_txs, list) else 'ERROR'} transactions (disabled)")
         
         # Combine results (handle exceptions)
         if isinstance(eth_txs, list):
@@ -239,7 +243,12 @@ class BlockchainMonitor:
         # Sort by USD value (highest first)
         all_transactions.sort(key=lambda x: x["amount_usd"], reverse=True)
         
-        logger.info(f"Found {len(all_transactions)} whale transactions above ${config.usd_threshold:,.0f}")
+        if all_transactions:
+            logger.info(f"✅ WHALE ALERTS: {len(all_transactions)} transaction(s) over ${config.usd_threshold:,.0f}")
+        else:
+            logger.info(f"⚠️  NO WHALES: No transactions over ${config.usd_threshold:,.0f}")
+        logger.info("=" * 70)
+
         return all_transactions
     
     async def process_highest_transaction(self):
@@ -247,24 +256,21 @@ class BlockchainMonitor:
         transactions = await self.fetch_whale_transactions()
         
         if not transactions:
-            logger.info("No whale transactions found")
             return
         
-        logger.info(f"Processing {len(transactions)} whale transaction(s)...")
+        logger.info("")
+        logger.info("📤 POSTING TRANSACTIONS")
+        logger.info("-" * 70)
         
         # Post each transaction to Discord (skip duplicates)
         posted_count = 0
-        for tx in transactions:
+        for idx, tx in enumerate(transactions, 1):
             # Skip if already posted
             if tx['hash'] in self.posted_hashes:
-                logger.debug(f"Skipping duplicate transaction: {tx['hash']}")
+                logger.debug(f"   ⏭️  Skipped (duplicate): {tx['hash'][:16]}...")
                 continue
             
-            logger.info(
-                f"Transaction: {tx['asset']} "
-                f"${tx['amount_usd']:,.0f} "
-                f"({tx['amount']:,.4f} {tx['asset']})"
-            )
+            logger.info(f"   [{idx}] {tx['asset']} | ${tx['amount_usd']:,.0f} | {tx['amount']:,.4f} {tx['asset']}")
             
             # Identify exchanges and determine transaction type
             from_entity = identify_address(tx['from'])
@@ -299,12 +305,20 @@ class BlockchainMonitor:
                 # Track this transaction to avoid duplicates
                 self.posted_hashes.add(tx['hash'])
                 posted_count += 1
+                logger.info("        ✅ Posted to Discord")
                 # Small delay between posts to avoid rate limiting
                 await asyncio.sleep(1)
             else:
-                logger.error(f"Failed to post {tx['asset']} transaction to Discord")
+                logger.error(f"        ❌ Failed to post {tx['asset']} transaction")
         
-        logger.info(f"Successfully posted {posted_count} new transaction(s) to Discord")
+        if posted_count > 0:
+            logger.info("-" * 70)
+            logger.info(f"🎉 SUCCESS: Posted {posted_count} new transaction(s) to Discord")
+            logger.info("=" * 70)
+        else:
+            logger.info("-" * 70)
+            logger.info("⏭️  All transactions already posted")
+            logger.info("=" * 70)
     
     async def monitor_loop(self):
         """Main monitoring loop that checks every second for real-time updates."""
