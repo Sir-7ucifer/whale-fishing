@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
+User=ubuntu
 WorkingDirectory=/home/ubuntu/whale-fishing
 Environment="PATH=/home/ubuntu/whale-fishing/venv/bin"
 ExecStart=/home/ubuntu/whale-fishing/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
