@@ -17,7 +17,7 @@ A real-time crypto whale transaction monitoring system that automatically detect
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────┐
 │ Blockchain Data     │
 │ Provider (Webhook)  │
@@ -84,6 +84,7 @@ PRICE_CACHE_TTL=60
 ### 4. Run the Service
 
 **Windows (Development):**
+
 ```powershell
 # Activate virtual environment
 .\venv\Scripts\Activate.ps1
@@ -93,6 +94,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 **Ubuntu (Production with Auto-Start):**
+
 ```bash
 # Make setup script executable
 chmod +x setup-autostart.sh
@@ -108,13 +110,15 @@ The service will start on `http://localhost:8000` and begin automatic monitoring
 ### 5. Verify Setup
 
 Check application startup logs:
-```
+
+```text
 Application startup complete
 Found 0 whale transactions above $1,000,000
 Waiting 60 seconds until next check...
 ```
 
 Send a test alert to verify Discord integration:
+
 ```powershell
 curl -X POST http://localhost:8000/test-alert
 ```
@@ -128,6 +132,7 @@ You should see a whale alert in your Discord channel immediately! 🎉
 Health check endpoint - returns service status and configuration.
 
 **Response:**
+
 ```json
 {
   "status": "running",
@@ -144,6 +149,7 @@ Health check endpoint - returns service status and configuration.
 Sends a sample whale alert to Discord for verification.
 
 **Response:**
+
 ```json
 {
   "status": "posted",
@@ -156,6 +162,7 @@ Sends a sample whale alert to Discord for verification.
 Legacy endpoint for manual webhook testing (not used for automatic monitoring).
 
 **Request Body:**
+
 ```json
 {
   "asset": "BTC",
@@ -175,7 +182,7 @@ The bot uses **free, public blockchain explorers** and automatically polls them 
 ### Supported Networks & Data Sources
 
 | Network | Data Source | API | Rate Limit | Coverage |
-|---------|------------|-----|-----------|----------|
+| --------- | ------------ | ----- | ----------- | ---------- |
 | **Bitcoin (BTC)** | Blockchain.info | Free API | 1 req/sec | Last 10 transactions |
 | **Ethereum (ETH)** | Etherscan | Free API | 5 calls/sec | USDT transfers (latest block) |
 | **XRP (XRP)** | XRP Scan | Free API | Unlimited | Payment transactions |
@@ -193,11 +200,13 @@ The bot uses **free, public blockchain explorers** and automatically polls them 
 ### Testing Alerts Manually
 
 You can test the Discord integration with:
+
 ```powershell
 curl -X POST http://localhost:8000/test-alert
 ```
 
 Or trigger the monitoring loop manually:
+
 ```powershell
 curl -X GET http://localhost:8000/health
 ```
@@ -207,7 +216,7 @@ curl -X GET http://localhost:8000/health
 ### Environment Variables
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
+| ---------- | ---------- | --------- | ------------- |
 | `DISCORD_WEBHOOK_URL` | ✅ Yes | - | Discord webhook URL for posting alerts |
 | `USD_THRESHOLD` | ❌ No | 1000000 | Minimum USD value to trigger alert |
 | `CHECK_INTERVAL` | ❌ No | 60 | Seconds between blockchain checks |
@@ -217,7 +226,7 @@ curl -X GET http://localhost:8000/health
 ### Supported Assets
 
 | Asset | Symbol | Explorer | Data Source |
-|-------|--------|----------|-------------|
+| ------- | -------- | ---------- | ------------- |
 | Bitcoin | BTC | blockchain.com | Blockchain.info API |
 | Ethereum | ETH | etherscan.io | Etherscan API |
 | Ripple | XRP | xrpscan.com | XRP Scan API |
@@ -226,6 +235,7 @@ curl -X GET http://localhost:8000/health
 ### Known Exchange Addresses
 
 The bot automatically identifies transactions involving these exchanges:
+
 - Binance (multiple wallets)
 - Coinbase
 - Kraken
@@ -240,6 +250,7 @@ The bot automatically identifies transactions involving these exchanges:
 - ... and more
 
 **Transaction Type Indicators:**
+
 - 🟢 **Buy**: Whale receiving from exchange
 - 🔴 **Sell**: Whale sending to exchange
 - 🟠 **Transfer**: Non-exchange address interactions
@@ -249,7 +260,8 @@ The bot automatically identifies transactions involving these exchanges:
 Alerts are posted as color-coded rich embeds:
 
 **Buy Alert (Green 🟢):**
-```
+
+```text
 📈 Whale BOUGHT 25.5 BTC!
 Value: $2,500,000
 From: Binance (0x123...)
@@ -258,7 +270,8 @@ Tx: [View on Explorer]
 ```
 
 **Sell Alert (Red 🔴):**
-```
+
+```text
 📉 Whale SOLD 50 ETH!
 Value: $1,500,000
 From: Unknown Whale
@@ -267,7 +280,8 @@ Tx: [View on Explorer]
 ```
 
 **Transfer Alert (Orange 🟠):**
-```
+
+```text
 🔄 Whale TRANSFERRED 1000 XRP
 Value: $1,200,000
 From: 0x789...
@@ -276,6 +290,7 @@ Tx: [View on Explorer]
 ```
 
 Each alert includes:
+
 - Emoji indicator (📈 buy, 📉 sell, 🔄 transfer)
 - Asset symbol and amount
 - USD value (formatted with commas)
@@ -308,12 +323,14 @@ sudo ./setup-autostart.sh
 ```
 
 The bot will now:
+
 - ✅ Start automatically on server boot
 - ✅ Restart automatically if it crashes
 - ✅ Run 24/7 without SSH session needed
 - ✅ Log to systemd journal (view with `sudo journalctl -u whale-tracker -f`)
 
 **Manage the service:**
+
 ```bash
 sudo systemctl status whale-tracker     # Check status
 sudo systemctl stop whale-tracker       # Stop bot
@@ -340,6 +357,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 Build and run:
+
 ```bash
 docker build -t whale-tracker .
 docker run -p 8000:8000 --env-file .env whale-tracker
@@ -359,16 +377,19 @@ docker run -p 8000:8000 --env-file .env whale-tracker
 ### Bot starts but no alerts appear
 
 1. **Verify Discord webhook URL:**
+
    ```bash
    curl -X POST http://localhost:8000/test-alert
    ```
+
    You should see a test alert in Discord.
 
 2. **Check logs for errors:**
+
    ```bash
    # Windows
    # Look at terminal output
-   
+
    # Ubuntu (systemd)
    sudo journalctl -u whale-tracker -n 50
    ```
@@ -418,7 +439,7 @@ sudo chown -R www-data:www-data /home/ubuntu/whale-fishing
 
 ## Project Structure
 
-```
+```text
 whale-fishing/
 ├── app/
 │   ├── __init__.py
@@ -441,7 +462,7 @@ whale-fishing/
 ### Module Overview
 
 | Module | Purpose |
-|--------|---------|
+| -------- | --------- |
 | `main.py` | FastAPI app with lifespan management, routes, monitoring loop |
 | `config.py` | Pydantic-based configuration loading from `.env` |
 | `pricing.py` | CoinGecko API client with in-memory TTL cache |
@@ -470,6 +491,7 @@ curl -X POST http://localhost:8000/test-alert
 ### Modifying Thresholds or Intervals
 
 Edit `.env`:
+
 ```env
 USD_THRESHOLD=500000        # Alert on $500k+ instead of $1M
 CHECK_INTERVAL=30           # Check every 30 seconds instead of 60
@@ -494,6 +516,7 @@ MIT License - feel free to use and modify for your needs.
 ## Support
 
 For issues or questions:
+
 - Check the **Troubleshooting** section above
 - Review **Logs**:
   - Windows: Terminal output
