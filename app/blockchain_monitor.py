@@ -231,55 +231,61 @@ class BlockchainMonitor:
         return all_transactions
     
     async def process_highest_transaction(self):
-        """Fetch transactions and post the highest valued one to Discord."""
+        """Fetch transactions and post all whale transactions to Discord."""
         transactions = await self.fetch_whale_transactions()
         
         if not transactions:
-            logger.info("No whale transactions found in the last 10 minutes")
+            logger.info("No whale transactions found")
             return
         
-        # Get the highest valued transaction
-        highest = transactions[0]
+        logger.info(f"Processing {len(transactions)} whale transaction(s)...")
         
-        logger.info(
-            f"Highest transaction: {highest['asset']} "
-            f"${highest['amount_usd']:,.0f} "
-            f"({highest['amount']:,.4f} {highest['asset']})"
-        )
+        # Post each transaction to Discord
+        posted_count = 0
+        for tx in transactions:
+            logger.info(
+                f"Transaction: {tx['asset']} "
+                f"${tx['amount_usd']:,.0f} "
+                f"({tx['amount']:,.4f} {tx['asset']})"
+            )
+            
+            # Identify exchanges and determine transaction type
+            from_entity = identify_address(tx['from'])
+            to_entity = identify_address(tx['to'])
+            tx_type = determine_transaction_type(tx['from'], tx['to'])
+            
+            # Build owner info if available
+            from_info = tx['from']
+            if from_entity:
+                from_info = f"{from_entity} ({from_info})"
+            elif tx['from_owner']:
+                from_info = f"{tx['from_owner']} ({from_info})"
+            
+            to_info = tx['to']
+            if to_entity:
+                to_info = f"{to_entity} ({to_info})"
+            elif tx['to_owner']:
+                to_info = f"{tx['to_owner']} ({to_info})"
+            
+            # Post to Discord
+            success = await discord_poster.post_whale_alert(
+                asset=tx['asset'],
+                amount=tx['amount'],
+                usd_value=tx['amount_usd'],
+                sender=from_info,
+                receiver=to_info,
+                tx_hash=tx['hash'],
+                transaction_type=tx_type
+            )
+            
+            if success:
+                posted_count += 1
+                # Small delay between posts to avoid rate limiting
+                await asyncio.sleep(1)
+            else:
+                logger.error(f"Failed to post {tx['asset']} transaction to Discord")
         
-        # Identify exchanges and determine transaction type
-        from_entity = identify_address(highest['from'])
-        to_entity = identify_address(highest['to'])
-        tx_type = determine_transaction_type(highest['from'], highest['to'])
-        
-        # Build owner info if available
-        from_info = highest['from']
-        if from_entity:
-            from_info = f"{from_entity} ({from_info})"
-        elif highest['from_owner']:
-            from_info = f"{highest['from_owner']} ({from_info})"
-        
-        to_info = highest['to']
-        if to_entity:
-            to_info = f"{to_entity} ({to_info})"
-        elif highest['to_owner']:
-            to_info = f"{highest['to_owner']} ({to_info})"
-        
-        # Post to Discord
-        success = await discord_poster.post_whale_alert(
-            asset=highest['asset'],
-            amount=highest['amount'],
-            usd_value=highest['amount_usd'],
-            sender=from_info,
-            receiver=to_info,
-            tx_hash=highest['hash'],
-            transaction_type=tx_type
-        )
-        
-        if success:
-            logger.info("Successfully posted highest transaction to Discord")
-        else:
-            logger.error("Failed to post highest transaction to Discord")
+        logger.info(f"Successfully posted {posted_count}/{len(transactions)} transactions to Discord")
     
     async def monitor_loop(self):
         """Main monitoring loop that checks every 10 minutes."""
