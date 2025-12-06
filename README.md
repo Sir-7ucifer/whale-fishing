@@ -53,7 +53,7 @@ A real-time crypto whale transaction monitoring system that automatically detect
 cd whale-fishing
 
 # Create virtual environment
-python -m venv venv
+python3 -m venv venv
 .\venv\Scripts\Activate.ps1
 
 # Install dependencies
