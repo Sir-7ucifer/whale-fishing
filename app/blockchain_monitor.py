@@ -62,6 +62,8 @@ class BlockchainMonitor:
                                     "hash": tx.get("hash", ""),
                                     "timestamp": int(tx.get("timeStamp", 0))
                                 })
+            else:
+                logger.debug(f"ETH API response: {data.get('message', 'No data')}")
             
             return transactions
             
@@ -152,6 +154,8 @@ class BlockchainMonitor:
                                         "hash": tx.get("hash", ""),
                                         "timestamp": int(tx.get("closeTime", 0))
                                     })
+            else:
+                logger.debug(f"XRP API response: No transactions in response")
             
             return transactions
             
@@ -189,6 +193,8 @@ class BlockchainMonitor:
                                     "hash": tx.get("signature", ""),
                                     "timestamp": int(tx.get("blockTime", 0))
                                 })
+            else:
+                logger.debug("SOL API response: No data in response")
             
             return transactions
             
@@ -214,6 +220,12 @@ class BlockchainMonitor:
         eth_txs, btc_txs, xrp_txs, sol_txs = await asyncio.gather(
             eth_task, btc_task, xrp_task, sol_task, return_exceptions=True
         )
+        
+        # Log results from each chain
+        logger.info(f"ETH: {len(eth_txs) if isinstance(eth_txs, list) else 'ERROR'} transactions found")
+        logger.info(f"BTC: {len(btc_txs) if isinstance(btc_txs, list) else 'ERROR'} transactions found")
+        logger.info(f"XRP: {len(xrp_txs) if isinstance(xrp_txs, list) else 'ERROR'} transactions found")
+        logger.info(f"SOL: {len(sol_txs) if isinstance(sol_txs, list) else 'ERROR'} transactions found")
         
         # Combine results (handle exceptions)
         if isinstance(eth_txs, list):
